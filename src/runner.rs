@@ -175,25 +175,28 @@ impl Runner {
             .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
             .collect();
 
-        let n_nn = attractor_set.difference(&target_set).count() + attractor_points.len()
-            - attractor_points_inside_bounds.len();
+        let n_nn = attractor_set.difference(&target_set).count();
         let n_nd = target_set.difference(&attractor_set).count();
 
-        let n_a = attractor_points.len();
-        let n_i = self.target_ifs_points.len();
+        let n_a = attractor_set.len();
+        let n_i = target_set.len();
 
         let r_c = n_nd as f64 / n_i as f64;
         let r_o = n_nn as f64 / n_a as f64;
 
-        //println!("{:?}", n_nn);
-        //println!("{:?}", n_a);
-        //println!("{:?}", n_nd);
-        //println!("{:?}", n_i);
-        //println!("{:?}", r_c);
-        //println!("{:?}", r_o);
-        //println!("----");
+        let fitness = (PARAMS.p_rc * (1.0 - r_c)
+            + PARAMS.p_ro * (1.0 - r_o)
+            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64)))
+            / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at);
 
-        let fitness = PARAMS.p_rc * (1.0 - r_c) + PARAMS.p_ro * (1.0 - r_o);
+        println!("n_nn:{:?}", n_nn);
+        println!("n_a:{:?}", n_a);
+        println!("n_nd:{:?}", n_nd);
+        println!("n_i:{:?}", n_i);
+        println!("r_c:{:?}", r_c);
+        println!("r_o:{:?}", r_o);
+        println!("fitness:{:?}", fitness);
+        println!("----");
 
         fitness
     }
@@ -232,7 +235,9 @@ impl Runner {
         new_pop.extend(self.reassortment_offspring());
 
         for ifs in new_pop.iter_mut() {
-            if rng.gen::<f64>() < self.mean_fitness.unwrap() / 2.0 {
+            if rng.gen::<f64>()
+                < self.mean_fitness.unwrap() / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at)
+            {
                 gaussian_mutation(ifs);
             } else {
                 random_or_binary_mutation(ifs);
