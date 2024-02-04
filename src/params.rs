@@ -22,7 +22,7 @@ pub struct Params {
 }
 
 pub const PARAMS: Params = Params {
-    n_points: 100_000,
+    n_points: 10_000,
     initial_point: (0.0, 0.0),
     min_individual_degree: 4,
     max_individual_degree: 4,
@@ -30,15 +30,15 @@ pub const PARAMS: Params = Params {
     recombination_population_size: 4,
     max_self_creation_population_size: 10,
     reassortment_population_size: 20,
-    elite_fitness_threshold: 0.5,
+    elite_fitness_threshold: 0.8,
     p_arithmetic_crossover: 0.5,
     p_vector_crossover: 0.5,
     a: 0.5,
     max_singel_coefficient: 1.0,
     min_singel_coefficient: -1.0,
     gaussian_mutation_radius: 0.01,
-    mutation_probability: 0.4,
+    mutation_probability: 0.8,
     fitness_grid_resolution: 200,
-    p_rc: 0.8,
-    p_ro: 0.2,
+    p_rc: 0.2,
+    p_ro: 0.8,
 };

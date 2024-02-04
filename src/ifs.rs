@@ -1,7 +1,7 @@
 use plotters::prelude::*;
 use rand::seq::SliceRandom;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IteratedFunctionSystem {
     pub functions: Vec<[f64; 6]>,
     pub fitness: f64,
@@ -16,6 +16,13 @@ pub trait Sierpinski {
 }
 
 impl IteratedFunctionSystem {
+    pub fn new() -> Self {
+        IteratedFunctionSystem {
+            functions: Vec::new(),
+            fitness: 0.0,
+        }
+    }
+
     pub fn add_function(&mut self, function: [f64; 6]) {
         self.functions.push(function);
     }
@@ -77,7 +84,6 @@ impl IteratedFunctionSystem {
 impl Barnsley for IteratedFunctionSystem {
     fn barnsley_fern() -> Self {
         let funcs: Vec<[f64; 6]> = vec![
-            [0., 0., 0., 0.16, 0., 0.],
             [0., 0., 0., 0.16, 0., 0.0],
             [0.85, 0.04, -0.04, 0.85, 0.0, 1.6],
             [0.2, -0.26, 0.23, 0.22, 0.0, 1.6],

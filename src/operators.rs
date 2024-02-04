@@ -82,16 +82,6 @@ pub fn one_point_crossover(
         }
     }
 
-    c1.functions
-        .extend_from_slice(&p2.functions[crossover_point..]);
-
-    let mut c2 = IteratedFunctionSystem {
-        functions: p2.functions[..crossover_point].to_vec(),
-        fitness: 0.0,
-    };
-    c2.functions
-        .extend_from_slice(&p1.functions[crossover_point..]);
-
     return (c1, c2);
 }
 
