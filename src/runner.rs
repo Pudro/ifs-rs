@@ -189,14 +189,14 @@ impl Runner {
             + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64)))
             / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at);
 
-        println!("n_nn:{:?}", n_nn);
-        println!("n_a:{:?}", n_a);
-        println!("n_nd:{:?}", n_nd);
-        println!("n_i:{:?}", n_i);
-        println!("r_c:{:?}", r_c);
-        println!("r_o:{:?}", r_o);
-        println!("fitness:{:?}", fitness);
-        println!("----");
+        //println!("n_nn:{:?}", n_nn);
+        //println!("n_a:{:?}", n_a);
+        //println!("n_nd:{:?}", n_nd);
+        //println!("n_i:{:?}", n_i);
+        //println!("r_c:{:?}", r_c);
+        //println!("r_o:{:?}", r_o);
+        //println!("fitness:{:?}", fitness);
+        //println!("----");
 
         fitness
     }
@@ -410,8 +410,9 @@ impl Runner {
             .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
             .collect();
 
-        let image_name = format!("{}.png", iter);
-        let root = BitMapBackend::new(&image_name, (1200, 1200)).into_drawing_area();
+        let img_name = format!("/{}.png", iter);
+        let img_path = PARAMS.save_path.clone() + &img_name;
+        let root = BitMapBackend::new(&img_path, (1200, 1200)).into_drawing_area();
 
         root.fill(&WHITE).unwrap();
 

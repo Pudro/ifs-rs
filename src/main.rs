@@ -17,14 +17,28 @@ fn main() {
 
     let mut runner = Runner::new(target);
     runner.generate_first_population();
-    for i in 1..2001 {
-        runner.step();
-        println!("----------Generation {i}----------");
-        println!("Mean Fitness:{:?}", runner.mean_fitness.unwrap());
-        println!("Best Fitness:{:?}", runner.best.fitness);
-        if i % 20 == 0 {
-            runner.best.plot_fractal(500_000, (0.0, 0.0));
-            runner.plot_fitness_grid(i);
-        }
-    }
+    runner.step();
+    let mut ifs = IteratedFunctionSystem::new();
+    ifs.add_function([0.0, 0.0, 0.0, 0.15, 0.0, 0.0]);
+    ifs.add_function([0.75, 0.02, -0.2, 0.85, 0.0, 1.6]);
+    ifs.add_function([0.05, -0.28, 0.11, 0.20, 0.5, 0.8]);
+    ifs.add_function([-0.13, 0.36, 0.24, 0.12, 0.0, 0.46]);
+    ifs.fitness = 100.0;
+    runner.best = ifs.clone();
+    runner.population.push(ifs);
+    runner.plot_fitness_grid(1);
+    runner.best.plot_fractal(500_000, (0.0, 0.0));
+
+    //for i in 1..4001 {
+    //    runner.step();
+    //    println!("----------Generation {i}----------");
+    //    println!("Mean Fitness:{:?}", runner.mean_fitness.unwrap());
+    //    println!("Best Fitness:{:?}", runner.best.fitness);
+    //    println!("Best Fitness:{:?}", runner.best);
+    //    if i % 1 == 0 {
+    //        runner.best.plot_fractal(500_000, (0.0, 0.0));
+    //        runner.plot_fitness_grid(i);
+    //        //runner.write_best();
+    //    }
+    //}
 }

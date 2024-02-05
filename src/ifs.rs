@@ -1,4 +1,6 @@
+use crate::params::PARAMS;
 use plotters::prelude::*;
+use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 
 #[derive(Debug, Clone)]
@@ -29,11 +31,10 @@ impl IteratedFunctionSystem {
 
     pub fn apply_function(&self, point: (f64, f64)) -> (f64, f64) {
         let mut rng = rand::thread_rng();
-        let choice = self.functions.choose(&mut rng);
-        let function = match choice {
-            Some(function) => function,
-            None => panic!("Could not draw a random function from the IFS!"),
-        };
+        let selection_probabilities = vec![0.1, 0.85, 0.07, 0.07];
+        let weighted_index = WeightedIndex::new(selection_probabilities).unwrap();
+        let selected_index = weighted_index.sample(&mut rng);
+        let function = self.functions[selected_index].clone();
 
         (
             function[0] * point.0 + function[1] * point.1 + function[4],
@@ -54,7 +55,8 @@ impl IteratedFunctionSystem {
     pub fn plot_fractal(&self, num_points: i64, initial_point: (f64, f64)) {
         let points = self.generate_points(num_points, initial_point);
 
-        let root = BitMapBackend::new("fractal.png", (800, 800)).into_drawing_area();
+        let img_path = PARAMS.save_path.clone() + "/fractal.png";
+        let root = BitMapBackend::new(&img_path, (2000, 2000)).into_drawing_area();
         root.fill(&WHITE).unwrap();
 
         let mut chart = ChartBuilder::on(&root)
