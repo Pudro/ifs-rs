@@ -50,8 +50,6 @@ impl IteratedFunctionSystem {
             .map(|d| d / determinants.iter().sum::<f64>())
             .collect();
 
-        println!("{:#?}", selection_probabilities);
-
         let weighted_index = WeightedIndex::new(selection_probabilities).unwrap();
         let selected_index = weighted_index.sample(&mut rng);
         let function = self.functions[selected_index].clone();
