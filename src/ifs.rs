@@ -31,7 +31,27 @@ impl IteratedFunctionSystem {
 
     pub fn apply_function(&self, point: (f64, f64)) -> (f64, f64) {
         let mut rng = rand::thread_rng();
-        let selection_probabilities = vec![0.1, 0.85, 0.07, 0.07];
+
+        let determinants: Vec<f64> = self
+            .functions
+            .iter()
+            .map(|f| {
+                let result = (f[0] * f[3] - f[2] * f[1]).abs();
+                if result > 0.0 {
+                    result
+                } else {
+                    0.001
+                }
+            })
+            .collect();
+
+        let selection_probabilities: Vec<f64> = determinants
+            .iter()
+            .map(|d| d / determinants.iter().sum::<f64>())
+            .collect();
+
+        println!("{:#?}", selection_probabilities);
+
         let weighted_index = WeightedIndex::new(selection_probabilities).unwrap();
         let selected_index = weighted_index.sample(&mut rng);
         let function = self.functions[selected_index].clone();
