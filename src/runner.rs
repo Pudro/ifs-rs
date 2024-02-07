@@ -1,5 +1,5 @@
 use plotters::prelude::*;
-use plotters::style::full_palette::{GREEN_900, GREY_100, GREY_50, PURPLE_300};
+use plotters::style::full_palette::{BLUE_300, GREEN_900, GREY_100, GREY_50, PURPLE_300};
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
 use std::collections::HashSet;
@@ -34,15 +34,33 @@ pub struct Runner {
 
 #[derive(Debug)]
 pub struct IFSBounds {
-    x_min: f64,
-    y_min: f64,
-    x_max: f64,
-    y_max: f64,
+    pub x_min: f64,
+    pub y_min: f64,
+    pub x_max: f64,
+    pub y_max: f64,
 }
 
 impl Runner {
     pub fn new(target_ifs: IteratedFunctionSystem) -> Self {
-        let target_ifs_points = target_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
+        // let target_ifs_points = target_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
+
+        // very ugly hot fix
+        let mut dummy_runner = Runner {
+            population: Vec::new(),
+            target_ifs: target_ifs.clone(),
+            target_ifs_points: target_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point),
+            _cached_ifs_bounds: None,
+            mean_fitness: None,
+            best: IteratedFunctionSystem::new(),
+            _kdtree: None,
+            _grid_points: Vec::new(),
+        };
+
+        let target_ifs_points = target_ifs.generate_quantized_points(
+            PARAMS.n_points,
+            PARAMS.initial_point,
+            Some(dummy_runner.target_ifs_bounds()),
+        );
 
         Runner {
             population: Vec::new(),
@@ -201,13 +219,65 @@ impl Runner {
         fitness
     }
 
+    pub fn calculate_fitness_from_quantized(
+        &mut self,
+        attractor_ifs: &IteratedFunctionSystem,
+    ) -> f64 {
+        let attractor_points = attractor_ifs.generate_quantized_points(
+            PARAMS.n_points,
+            PARAMS.initial_point,
+            Some(self.target_ifs_bounds()),
+        );
+
+        let target_closest_points = self.target_ifs_points.clone();
+
+        let attractor_closest_points = attractor_points;
+
+        let attractor_set: HashSet<_> = attractor_closest_points
+            .iter()
+            .cloned()
+            .map(|point| [OrderedFloat(point.0), OrderedFloat(point.1)])
+            .collect();
+
+        let target_set: HashSet<_> = target_closest_points
+            .iter()
+            .cloned()
+            .map(|point| [OrderedFloat(point.0), OrderedFloat(point.1)])
+            .collect();
+
+        let n_nn = attractor_set.difference(&target_set).count();
+        let n_nd = target_set.difference(&attractor_set).count();
+
+        let n_a = attractor_set.len();
+        let n_i = target_set.len();
+
+        let r_c = n_nd as f64 / n_i as f64;
+        let r_o = n_nn as f64 / n_a as f64;
+
+        let fitness = (PARAMS.p_rc * (1.0 - r_c)
+            + PARAMS.p_ro * (1.0 - r_o)
+            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64)))
+            / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at);
+
+        //println!("n_nn:{:?}", n_nn);
+        //println!("n_a:{:?}", n_a);
+        //println!("n_nd:{:?}", n_nd);
+        //println!("n_i:{:?}", n_i);
+        //println!("r_c:{:?}", r_c);
+        //println!("r_o:{:?}", r_o);
+        //println!("fitness:{:?}", fitness);
+        //println!("----");
+
+        fitness
+    }
+
     pub fn step(&mut self) {
         let mut rng = rand::thread_rng();
         let mut new_pop = Vec::new();
 
         for idx in 0..self.population.len() {
             let ifs = &self.population[idx].clone();
-            self.population[idx].fitness = self.calculate_fitness(ifs);
+            self.population[idx].fitness = self.calculate_fitness_from_quantized(ifs);
         }
 
         self.mean_fitness = Some(
@@ -235,8 +305,8 @@ impl Runner {
         new_pop.extend(self.reassortment_offspring());
 
         for ifs in new_pop.iter_mut() {
-            if rng.gen::<f64>()
-                < self.mean_fitness.unwrap() / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at)
+            if rng.gen::<f64>() < self.mean_fitness.unwrap()
+            // normalized fitness max 1.0
             {
                 gaussian_mutation(ifs);
             } else {
@@ -358,6 +428,35 @@ impl Runner {
     }
 
     pub fn plot_fitness_grid(&mut self, iter: usize) {
+        // TODO make a private method for this block
+        if self._kdtree.is_none() {
+            let grid_x = Array::linspace(
+                self.target_ifs_bounds().x_min,
+                self.target_ifs_bounds().x_max,
+                PARAMS.fitness_grid_resolution as usize,
+            );
+            let grid_y = Array::linspace(
+                self.target_ifs_bounds().y_min,
+                self.target_ifs_bounds().y_max,
+                PARAMS.fitness_grid_resolution as usize,
+            );
+
+            self._grid_points = Vec::new();
+            for &x in grid_x.iter() {
+                for &y in grid_y.iter() {
+                    self._grid_points.push([x, y]);
+                }
+            }
+
+            let mut kdtree: KdTree<f64, i32, [f64; 2]> = KdTree::new(2);
+
+            for (i, point) in self._grid_points.iter().enumerate() {
+                kdtree.add(*point, i as i32).unwrap();
+            }
+
+            self._kdtree = Some(kdtree);
+        }
+
         let attractor_ifs = self.best.clone();
         let attractor_points = attractor_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
         let attractor_points_inside_bounds: Vec<[f64; 2]> = attractor_points
@@ -371,8 +470,11 @@ impl Runner {
             .map(|&(x, y)| [x, y])
             .collect::<Vec<[f64; 2]>>();
 
-        let target_closest_points = self
-            .target_ifs_points
+        let target_points = self
+            .best
+            .generate_points(PARAMS.n_points, PARAMS.initial_point);
+
+        let target_closest_points = target_points
             .iter()
             .map(|(x, y)| {
                 self._grid_points[*self
@@ -423,7 +525,7 @@ impl Runner {
             )
             .unwrap();
 
-        chart.configure_mesh().draw().unwrap();
+        //chart.configure_mesh().draw().unwrap();
 
         chart
             .draw_series(
@@ -441,7 +543,7 @@ impl Runner {
             )
             .unwrap()
             .label("Target Points")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 10, y)], &BLUE));
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], BLUE.filled()));
 
         chart
             .draw_series(
@@ -451,19 +553,19 @@ impl Runner {
             )
             .unwrap()
             .label("Attractor Points")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 10, y)], &RED));
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], RED.filled()));
 
         chart
             .draw_series(target_set.difference(&attractor_set).cloned().map(|point| {
                 Circle::new(
                     (f64::from(point[0]), f64::from(point[1])),
                     1.5,
-                    GREEN_900.filled(),
+                    BLUE_300.filled(),
                 )
             }))
             .unwrap()
             .label("Points not drawn")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 10, y)], &GREEN_900));
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], BLUE_300.filled()));
 
         chart
             .draw_series(attractor_set.difference(&target_set).cloned().map(|point| {
@@ -475,10 +577,12 @@ impl Runner {
             }))
             .unwrap()
             .label("Points not needed")
-            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 10, y)], &PURPLE_300));
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], PURPLE_300.filled()));
 
         chart
             .configure_series_labels()
+            .background_style(WHITE.mix(0.5))
+            .position(SeriesLabelPosition::UpperLeft)
             .label_font(("Calibri", 26))
             .draw()
             .unwrap();
