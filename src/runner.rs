@@ -2,6 +2,7 @@ use plotters::prelude::*;
 use plotters::style::full_palette::{BLUE_300, GREEN_900, GREY_100, GREY_50, PURPLE_300};
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::*;
+use rand_distr::Normal;
 use std::collections::HashSet;
 use std::fmt::format;
 use std::hash::Hash;
@@ -254,9 +255,7 @@ impl Runner {
         let r_c = n_nd as f64 / n_i as f64;
         let r_o = n_nn as f64 / n_a as f64;
 
-        let fitness = (PARAMS.p_rc * (1.0 - r_c)
-            + PARAMS.p_ro * (1.0 - r_o)
-            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64)))
+        let fitness = (PARAMS.p_rc * (1.0 - r_c) + PARAMS.p_ro * (1.0 - r_o))
             / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at);
 
         //println!("n_nn:{:?}", n_nn);
@@ -429,88 +428,88 @@ impl Runner {
 
     pub fn plot_fitness_grid(&mut self, iter: usize) {
         // TODO make a private method for this block
-        if self._kdtree.is_none() {
-            let grid_x = Array::linspace(
-                self.target_ifs_bounds().x_min,
-                self.target_ifs_bounds().x_max,
-                PARAMS.fitness_grid_resolution as usize,
-            );
-            let grid_y = Array::linspace(
-                self.target_ifs_bounds().y_min,
-                self.target_ifs_bounds().y_max,
-                PARAMS.fitness_grid_resolution as usize,
-            );
+        //if self._kdtree.is_none() {
+        //    let grid_x = Array::linspace(
+        //        self.target_ifs_bounds().x_min,
+        //        self.target_ifs_bounds().x_max,
+        //        PARAMS.fitness_grid_resolution as usize,
+        //    );
+        //    let grid_y = Array::linspace(
+        //        self.target_ifs_bounds().y_min,
+        //        self.target_ifs_bounds().y_max,
+        //        PARAMS.fitness_grid_resolution as usize,
+        //    );
 
-            self._grid_points = Vec::new();
-            for &x in grid_x.iter() {
-                for &y in grid_y.iter() {
-                    self._grid_points.push([x, y]);
-                }
-            }
+        //    self._grid_points = Vec::new();
+        //    for &x in grid_x.iter() {
+        //        for &y in grid_y.iter() {
+        //            self._grid_points.push([x, y]);
+        //        }
+        //    }
 
-            let mut kdtree: KdTree<f64, i32, [f64; 2]> = KdTree::new(2);
+        //    let mut kdtree: KdTree<f64, i32, [f64; 2]> = KdTree::new(2);
 
-            for (i, point) in self._grid_points.iter().enumerate() {
-                kdtree.add(*point, i as i32).unwrap();
-            }
+        //    for (i, point) in self._grid_points.iter().enumerate() {
+        //        kdtree.add(*point, i as i32).unwrap();
+        //    }
 
-            self._kdtree = Some(kdtree);
-        }
+        //    self._kdtree = Some(kdtree);
+        //}
 
         let attractor_ifs = self.best.clone();
         let attractor_points = attractor_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
-        let attractor_points_inside_bounds: Vec<[f64; 2]> = attractor_points
-            .iter()
-            .filter(|&&(x, y)| {
-                x >= self.target_ifs_bounds().x_min
-                    && x <= self.target_ifs_bounds().x_max
-                    && y >= self.target_ifs_bounds().y_min
-                    && y <= self.target_ifs_bounds().y_max
-            })
-            .map(|&(x, y)| [x, y])
-            .collect::<Vec<[f64; 2]>>();
+        //let attractor_points_inside_bounds: Vec<[f64; 2]> = attractor_points
+        //    .iter()
+        //    .filter(|&&(x, y)| {
+        //        x >= self.target_ifs_bounds().x_min
+        //            && x <= self.target_ifs_bounds().x_max
+        //            && y >= self.target_ifs_bounds().y_min
+        //            && y <= self.target_ifs_bounds().y_max
+        //    })
+        //    .map(|&(x, y)| [x, y])
+        //    .collect::<Vec<[f64; 2]>>();
 
         let target_points = self
-            .best
+            .target_ifs
             .generate_points(PARAMS.n_points, PARAMS.initial_point);
 
-        let target_closest_points = target_points
-            .iter()
-            .map(|(x, y)| {
-                self._grid_points[*self
-                    ._kdtree
-                    .as_ref()
-                    .unwrap()
-                    .nearest(&[*x, *y], 1, &squared_euclidean)
-                    .unwrap()[0]
-                    .1 as usize]
-            })
-            .collect::<Vec<[f64; 2]>>();
+        //let target_closest_points = target_points
+        //    .iter()
+        //    .map(|(x, y)| {
+        //        self._grid_points[*self
+        //            ._kdtree
+        //            .as_ref()
+        //            .unwrap()
+        //            .nearest(&[*x, *y], 1, &squared_euclidean)
+        //            .unwrap()[0]
+        //            .1 as usize]
+        //    })
+        //    .collect::<Vec<[f64; 2]>>();
 
-        let attractor_closest_points = attractor_points_inside_bounds
-            .iter()
-            .map(|point| {
-                self._grid_points[*self
-                    ._kdtree
-                    .as_ref()
-                    .unwrap()
-                    .nearest(point, 1, &squared_euclidean)
-                    .unwrap()[0]
-                    .1 as usize]
-            })
-            .collect::<Vec<[f64; 2]>>();
+        //let attractor_closest_points = attractor_points_inside_bounds
+        //    .iter()
+        //    .map(|point| {
+        //        self._grid_points[*self
+        //            ._kdtree
+        //            .as_ref()
+        //            .unwrap()
+        //            .nearest(point, 1, &squared_euclidean)
+        //            .unwrap()[0]
+        //            .1 as usize]
+        //    })
+        //    .collect::<Vec<[f64; 2]>>();
 
-        let attractor_set: HashSet<_> = attractor_closest_points
-            .iter()
-            .cloned()
-            .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
-            .collect();
+        //let attractor_set: HashSet<_> = attractor_closest_points
+        //    .iter()
+        //    .cloned()
+        //    .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
+        //    .collect();
 
-        let target_set: HashSet<_> = target_closest_points
-            .iter()
-            .cloned()
-            .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
-            .collect();
+        //let target_set: HashSet<_> = target_closest_points
+        //    .iter()
+        //    .cloned()
+        //    .map(|point| [OrderedFloat(point[0]), OrderedFloat(point[1])])
+        //    .collect();
 
         let img_name = format!("/{}.png", iter);
         let img_path = PARAMS.save_path.clone() + &img_name;
@@ -537,7 +536,7 @@ impl Runner {
 
         chart
             .draw_series(
-                self.target_ifs_points
+                target_points
                     .iter()
                     .map(|point| Circle::new((point.0, point.1), 1, BLUE.filled())),
             )
@@ -555,29 +554,29 @@ impl Runner {
             .label("Attractor Points")
             .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], RED.filled()));
 
-        chart
-            .draw_series(target_set.difference(&attractor_set).cloned().map(|point| {
-                Circle::new(
-                    (f64::from(point[0]), f64::from(point[1])),
-                    1.5,
-                    BLUE_300.filled(),
-                )
-            }))
-            .unwrap()
-            .label("Points not drawn")
-            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], BLUE_300.filled()));
+        //chart
+        //    .draw_series(target_set.difference(&attractor_set).cloned().map(|point| {
+        //        Circle::new(
+        //            (f64::from(point[0]), f64::from(point[1])),
+        //            1.5,
+        //            BLUE_300.filled(),
+        //        )
+        //    }))
+        //    .unwrap()
+        //    .label("Points not drawn")
+        //    .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], BLUE_300.filled()));
 
-        chart
-            .draw_series(attractor_set.difference(&target_set).cloned().map(|point| {
-                Circle::new(
-                    (f64::from(point[0]), f64::from(point[1])),
-                    1.5,
-                    PURPLE_300.filled(),
-                )
-            }))
-            .unwrap()
-            .label("Points not needed")
-            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], PURPLE_300.filled()));
+        //chart
+        //    .draw_series(attractor_set.difference(&target_set).cloned().map(|point| {
+        //        Circle::new(
+        //            (f64::from(point[0]), f64::from(point[1])),
+        //            1.5,
+        //            PURPLE_300.filled(),
+        //        )
+        //    }))
+        //    .unwrap()
+        //    .label("Points not needed")
+        //    .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], PURPLE_300.filled()));
 
         chart
             .configure_series_labels()
