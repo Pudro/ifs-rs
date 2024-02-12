@@ -28,6 +28,7 @@ pub struct Params {
     pub p_rc: f64,
     pub p_ro: f64,
     pub p_at: f64,
+    pub p_bd: f64,
     pub save_path: String,
 }
 
@@ -73,6 +74,7 @@ pub static PARAMS: Lazy<Params> = Lazy::new(|| {
         p_rc: config.get("p_rc").unwrap(),
         p_ro: config.get("p_ro").unwrap(),
         p_at: config.get("p_at").unwrap(),
+        p_bd: config.get("p_bd").unwrap(),
         save_path: config.get("save_path").unwrap(),
     }
 });

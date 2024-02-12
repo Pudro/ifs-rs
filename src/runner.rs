@@ -1,3 +1,4 @@
+use linreg::linear_regression_of;
 use plotters::prelude::*;
 use plotters::style::full_palette::{BLUE_300, GREEN_900, GREY_100, GREY_50, PURPLE_300};
 use rand::distributions::{Distribution, WeightedIndex};
@@ -26,6 +27,7 @@ pub struct Runner {
     pub population: Vec<IteratedFunctionSystem>,
     pub target_ifs: IteratedFunctionSystem,
     pub target_ifs_points: Vec<(f64, f64)>,
+    target_ifs_bd: f64,
     _cached_ifs_bounds: Option<IFSBounds>,
     pub mean_fitness: Option<f64>,
     pub best: IteratedFunctionSystem,
@@ -50,6 +52,7 @@ impl Runner {
             population: Vec::new(),
             target_ifs: target_ifs.clone(),
             target_ifs_points: target_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point),
+            target_ifs_bd: 0.0,
             _cached_ifs_bounds: None,
             mean_fitness: None,
             best: IteratedFunctionSystem::new(),
@@ -63,10 +66,13 @@ impl Runner {
             Some(dummy_runner.target_ifs_bounds()),
         );
 
+        let target_ifs_bd = dummy_runner._calculate_box_dimension(target_ifs_points.clone());
+
         Runner {
             population: Vec::new(),
             target_ifs,
             target_ifs_points,
+            target_ifs_bd,
             _cached_ifs_bounds: None,
             mean_fitness: None,
             best: IteratedFunctionSystem::new(),
@@ -230,6 +236,10 @@ impl Runner {
             Some(self.target_ifs_bounds()),
         );
 
+        //self._count_boxes(attractor_points.clone());
+        let bd_a = self._calculate_box_dimension(attractor_points.clone());
+        let bd_t = self.target_ifs_bd;
+
         let target_closest_points = self.target_ifs_points.clone();
 
         let attractor_closest_points = attractor_points;
@@ -255,9 +265,23 @@ impl Runner {
         let r_c = n_nd as f64 / n_i as f64;
         let r_o = n_nn as f64 / n_a as f64;
 
-        let fitness = (PARAMS.p_rc * (1.0 - r_c) + PARAMS.p_ro * (1.0 - r_o))
-            / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at);
+        let fitness = (PARAMS.p_rc * (1.0 - r_c)
+            + PARAMS.p_ro * (1.0 - r_o)
+            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64))
+            + PARAMS.p_bd * (1.0 - (bd_a - bd_t).abs() * 10.0 / bd_t).max(0.0))
+            / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at + PARAMS.p_bd);
 
+        //println!("box: {:#?}", (bd_a - bd_t).abs() / bd_t);
+        //println!(
+        //    "bd: {:#?}",
+        //    PARAMS.p_bd * (1.0 - (bd_a - bd_t).abs() / bd_t)
+        //);
+        // println!(
+        //     "at: {:#?}",
+        //     PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64))
+        // );
+        // println!("ro: {:#?}", PARAMS.p_ro * (1.0 - r_o));
+        // println!("rc: {:#?}", PARAMS.p_rc * (1.0 - r_c));
         //println!("n_nn:{:?}", n_nn);
         //println!("n_a:{:?}", n_a);
         //println!("n_nd:{:?}", n_nd);
@@ -427,35 +451,6 @@ impl Runner {
     }
 
     pub fn plot_fitness_grid(&mut self, iter: usize) {
-        // TODO make a private method for this block
-        //if self._kdtree.is_none() {
-        //    let grid_x = Array::linspace(
-        //        self.target_ifs_bounds().x_min,
-        //        self.target_ifs_bounds().x_max,
-        //        PARAMS.fitness_grid_resolution as usize,
-        //    );
-        //    let grid_y = Array::linspace(
-        //        self.target_ifs_bounds().y_min,
-        //        self.target_ifs_bounds().y_max,
-        //        PARAMS.fitness_grid_resolution as usize,
-        //    );
-
-        //    self._grid_points = Vec::new();
-        //    for &x in grid_x.iter() {
-        //        for &y in grid_y.iter() {
-        //            self._grid_points.push([x, y]);
-        //        }
-        //    }
-
-        //    let mut kdtree: KdTree<f64, i32, [f64; 2]> = KdTree::new(2);
-
-        //    for (i, point) in self._grid_points.iter().enumerate() {
-        //        kdtree.add(*point, i as i32).unwrap();
-        //    }
-
-        //    self._kdtree = Some(kdtree);
-        //}
-
         let attractor_ifs = self.best.clone();
         let attractor_points = attractor_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
         //let attractor_points_inside_bounds: Vec<[f64; 2]> = attractor_points
@@ -585,5 +580,177 @@ impl Runner {
             .label_font(("Calibri", 26))
             .draw()
             .unwrap();
+    }
+
+    fn _count_boxes(&self, attractor_points: Vec<(f64, f64)>) {
+        let x_min = attractor_points
+            .iter()
+            .map(|&(x, _)| x)
+            .fold(f64::INFINITY, f64::min);
+
+        let x_max = attractor_points
+            .iter()
+            .map(|&(x, _)| x)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        let y_min = attractor_points
+            .iter()
+            .map(|&(_, y)| y)
+            .fold(f64::INFINITY, f64::min);
+
+        let y_max = attractor_points
+            .iter()
+            .map(|&(_, y)| y)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        let lx = (x_max - x_min).abs();
+        let ly = (y_max - y_min).abs();
+
+        println!("{} {}", lx, ly);
+
+        // computing the fractal dimension
+        // considering only scales in a logarithmic list
+        let mut scales = Vec::new();
+        for i in 0..10 {
+            let scale = 2_f64.powf(i as f64 * 0.01);
+            println!("======= Scale : {:?}", scale);
+            scales.push(scale);
+        }
+
+        let mut ns = Vec::new();
+        // looping over several scales
+        for &scale in &scales {
+            // computing the histogram
+            let mut hist =
+                vec![vec![0; (lx as f64 / scale) as usize]; (ly as f64 / scale) as usize];
+            for &(x, y) in &attractor_points {
+                println!("scale:{:#?}", scale);
+                let x_index = (x as f64 / scale) as usize;
+                let y_index = (y as f64 / scale) as usize;
+                hist[x_index][y_index] += 1;
+            }
+            let count = hist.iter().flatten().filter(|&&val| val > 0).count();
+            ns.push(count);
+        }
+
+        // linear fit, polynomial of degree 1
+        let mut x_log = Vec::new();
+        let mut ns_log = Vec::new();
+        for (&scale, &count) in scales.iter().zip(&ns) {
+            x_log.push(scale.log2());
+            ns_log.push(count as f64);
+        }
+
+        let sum_x_log = x_log.iter().sum::<f64>();
+        let sum_ns_log = ns_log.iter().sum::<f64>();
+        let sum_x_log_squared = x_log.iter().map(|&x| x * x).sum::<f64>();
+        let sum_x_log_ns_log = x_log
+            .iter()
+            .zip(&ns_log)
+            .map(|(&x, &ns)| x * ns)
+            .sum::<f64>();
+
+        let n = scales.len() as f64; // Number of scales used
+        let slope = (n * sum_x_log_ns_log - sum_x_log * sum_ns_log)
+            / (n * sum_x_log_squared - sum_x_log * sum_x_log);
+        println!("{:?}", slope);
+    }
+
+    pub fn _calculate_box_dimension(&self, attractor_points: Vec<(f64, f64)>) -> f64 {
+        let x_min = attractor_points
+            .iter()
+            .map(|&(x, _)| x)
+            .fold(f64::INFINITY, f64::min);
+
+        let x_max = attractor_points
+            .iter()
+            .map(|&(x, _)| x)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        let y_min = attractor_points
+            .iter()
+            .map(|&(_, y)| y)
+            .fold(f64::INFINITY, f64::min);
+
+        let y_max = attractor_points
+            .iter()
+            .map(|&(_, y)| y)
+            .fold(f64::NEG_INFINITY, f64::max);
+
+        //let scales = vec![15., 45.254834, 64., 90.50966799, 128., 181.01933598];
+        let scales = vec![30., 50., 100., 150., 250., 300.];
+        //let scales = vec![5.];
+
+        let mut dimensions = Vec::new();
+
+        for scale in scales {
+            let box_size_x = (x_max - x_min) / scale;
+            let box_size_y = (y_max - y_min) / scale;
+            let mut boxes = HashSet::new();
+
+            //println!("box_size_x,y: {:?}, {:?}", box_size_x, box_size_y);
+            for &(x, y) in attractor_points.iter() {
+                let box_x = (x / box_size_x).floor() as i32;
+                let box_y = (y / box_size_y).floor() as i32;
+
+                boxes.insert((box_x, box_y));
+            }
+
+            let mut edge_boxes = HashSet::new();
+            for &b in boxes.iter() {
+                let neighbors = [
+                    (b.0 - 1, b.1),
+                    (b.0 + 1, b.1),
+                    (b.0, b.1 - 1),
+                    (b.0, b.1 + 1),
+                ];
+
+                let mut all_neighbors_in_boxes = true;
+                for neighbor in neighbors.iter() {
+                    if !boxes.contains(neighbor) {
+                        all_neighbors_in_boxes = false;
+                        break;
+                    }
+                }
+
+                if !all_neighbors_in_boxes {
+                    edge_boxes.insert(b);
+                }
+                //check if all neighbors in boxes;
+                //if not, insert b into edge_boxes
+            }
+
+            dimensions.push((scale, boxes.len() as f64));
+            //println!("boxes: {:?}", boxes);
+            //println!("boxes len: {:?}", boxes.len());
+
+            //println!("edge_boxes: {:?}", edge_boxes);
+            //println!("edge_boxes len: {:?}", edge_boxes.len());
+        }
+
+        let mut log_scales = Vec::new();
+        let mut log_counts = Vec::new();
+
+        for (scale, count) in dimensions {
+            log_scales.push(scale);
+            log_counts.push(count);
+        }
+
+        let log_log = log_scales
+            .iter()
+            .zip(log_counts.iter())
+            .map(|(&x, &y)| (x.ln(), y.ln()))
+            .collect::<Vec<_>>();
+
+        let n = log_log.len() as f64;
+        let sum_xy = log_log.iter().fold(0.0, |acc, &(x, y)| acc + x * y);
+        let sum_x = log_log.iter().fold(0.0, |acc, &(x, _)| acc + x);
+        let sum_y = log_log.iter().fold(0.0, |acc, &(_, y)| acc + y);
+        let sum_x_squared = log_log.iter().fold(0.0, |acc, &(x, _)| acc + x * x);
+
+        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x_squared - sum_x.powi(2));
+
+        //println!("slope: {:#?}", slope);
+        slope
     }
 }

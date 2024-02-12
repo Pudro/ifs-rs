@@ -20,6 +20,10 @@ pub trait Sierpinski {
     fn sierpinski_triangle() -> Self;
 }
 
+pub trait Durer {
+    fn durer_pentagon() -> Self;
+}
+
 impl IteratedFunctionSystem {
     pub fn new() -> Self {
         IteratedFunctionSystem {
@@ -214,6 +218,21 @@ impl IteratedFunctionSystem {
     }
 }
 
+impl Sierpinski for IteratedFunctionSystem {
+    fn sierpinski_triangle() -> Self {
+        let funcs: Vec<[f64; 6]> = vec![
+            [0.5, 0., 0., 0.5, 0., 0.],
+            [0.5, 0., 0., 0.5, 0.5, 0.],
+            [0.5, 0., 0., 0.5, 0.25, 0.433],
+        ];
+
+        IteratedFunctionSystem {
+            functions: funcs,
+            fitness: 0.0,
+        }
+    }
+}
+
 impl Barnsley for IteratedFunctionSystem {
     fn barnsley_fern() -> Self {
         let funcs: Vec<[f64; 6]> = vec![
@@ -221,6 +240,24 @@ impl Barnsley for IteratedFunctionSystem {
             [0.85, 0.04, -0.04, 0.85, 0.0, 1.6],
             [0.2, -0.26, 0.23, 0.22, 0.0, 1.6],
             [-0.15, 0.28, 0.26, 0.24, 0.0, 0.44],
+        ];
+
+        IteratedFunctionSystem {
+            functions: funcs,
+            fitness: 0.0,
+        }
+    }
+}
+
+impl Durer for IteratedFunctionSystem {
+    fn durer_pentagon() -> Self {
+        let funcs: Vec<[f64; 6]> = vec![
+            [0.382, 0., 0., 0.382, 0., 0.],
+            [0.382, 0., 0., 0.382, 0.618, 0.],
+            [0.382, 0., 0., 0.382, 0.809, 0.588],
+            [0.382, 0., 0., 0.382, 0.309, 0.951],
+            [0.382, 0., 0., 0.382, -0.191, 0.588],
+            [-0.382, 0., 0., -0.382, 0.691, 0.951],
         ];
 
         IteratedFunctionSystem {
