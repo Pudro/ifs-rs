@@ -237,8 +237,8 @@ impl Runner {
         );
 
         //self._count_boxes(attractor_points.clone());
-        let bd_a = self._calculate_box_dimension(attractor_points.clone());
-        let bd_t = self.target_ifs_bd;
+        //let bd_a = self._calculate_box_dimension(attractor_points.clone());
+        //let bd_t = self.target_ifs_bd;
 
         let target_closest_points = self.target_ifs_points.clone();
 
@@ -267,8 +267,8 @@ impl Runner {
 
         let fitness = (PARAMS.p_rc * (1.0 - r_c)
             + PARAMS.p_ro * (1.0 - r_o)
-            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64))
-            + PARAMS.p_bd * (1.0 - (bd_a - bd_t).abs() * 10.0 / bd_t).max(0.0))
+            + PARAMS.p_at * (1.0 - (n_a.abs_diff(n_i) as f64) / (n_a as f64 + n_i as f64)))
+            //+ PARAMS.p_bd * (1.0 - (bd_a - bd_t).abs() * 10.0 / bd_t).max(0.0))
             / (PARAMS.p_rc + PARAMS.p_ro + PARAMS.p_at + PARAMS.p_bd);
 
         //println!("box: {:#?}", (bd_a - bd_t).abs() / bd_t);
@@ -294,13 +294,15 @@ impl Runner {
         fitness
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self, i: usize) {
         let mut rng = rand::thread_rng();
         let mut new_pop = Vec::new();
 
         for idx in 0..self.population.len() {
             let ifs = &self.population[idx].clone();
-            self.population[idx].fitness = self.calculate_fitness_from_quantized(ifs);
+            if self.population[idx].fitness == 0.0 {
+                self.population[idx].fitness = self.calculate_fitness_from_quantized(ifs);
+            }
         }
 
         self.mean_fitness = Some(
@@ -313,28 +315,36 @@ impl Runner {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let elite = self.population[0].clone();
+        // =========================
+        self.plot_comparison(self.population[1].clone(), i);
+        // =========================
 
         if self.population[0].fitness > self.best.fitness {
             self.best = self.population[0].clone();
         }
 
-        if elite.fitness > PARAMS.elite_fitness_threshold {
-            new_pop.push(elite);
-        }
-
         new_pop.extend(self.recombination_offspring());
         new_pop.extend(self.self_creation_offspring());
         new_pop.extend(self.reassortment_offspring());
+        new_pop.extend(
+            self.population[..(PARAMS.recombination_population_size
+                + PARAMS.reassortment_population_size
+                + PARAMS.max_self_creation_population_size) as usize
+                / 10]
+                .iter()
+                .cloned(),
+        );
 
         for ifs in new_pop.iter_mut() {
-            if rng.gen::<f64>() < self.mean_fitness.unwrap()
-            // normalized fitness max 1.0
-            {
+            if rng.gen::<f64>() < self.mean_fitness.unwrap() {
                 gaussian_mutation(ifs);
             } else {
                 random_or_binary_mutation(ifs);
             }
+        }
+
+        if self.best.fitness > PARAMS.elite_fitness_threshold {
+            new_pop.push(self.best.clone());
         }
 
         self.population = new_pop;
@@ -656,6 +666,62 @@ impl Runner {
         println!("{:?}", slope);
     }
 
+    pub fn plot_comparison(&mut self, ifs: IteratedFunctionSystem, iter: usize) {
+        let attractor_ifs = ifs;
+        let attractor_points = attractor_ifs.generate_points(PARAMS.n_points, PARAMS.initial_point);
+        let target_points = self
+            .target_ifs
+            .generate_points(PARAMS.n_points, PARAMS.initial_point);
+        let img_name = format!("/gen_{}.png", iter);
+        let img_path = PARAMS.save_path.clone() + &img_name;
+        let root = BitMapBackend::new(&img_path, (1200, 1200)).into_drawing_area();
+
+        root.fill(&WHITE).unwrap();
+
+        let mut chart = ChartBuilder::on(&root)
+            .build_cartesian_2d(
+                self.target_ifs_bounds().x_min..self.target_ifs_bounds().x_max,
+                self.target_ifs_bounds().y_min..self.target_ifs_bounds().y_max,
+            )
+            .unwrap();
+
+        chart
+            .draw_series(
+                self._grid_points
+                    .iter()
+                    .map(|point| Circle::new((point[0], point[1]), 1, GREY_100.filled())),
+            )
+            .unwrap();
+
+        chart
+            .draw_series(
+                target_points
+                    .iter()
+                    .map(|point| Circle::new((point.0, point.1), 1, BLUE.filled())),
+            )
+            .unwrap()
+            .label("Target Points")
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], BLUE.filled()));
+
+        chart
+            .draw_series(
+                attractor_points
+                    .iter()
+                    .map(|point| Circle::new((point.0, point.1), 1, RED.filled())),
+            )
+            .unwrap()
+            .label("Attractor Points")
+            .legend(|(x, y)| Rectangle::new([(x, y), (x + 10, y + 5)], RED.filled()));
+
+        chart
+            .configure_series_labels()
+            .background_style(WHITE.mix(0.5))
+            .position(SeriesLabelPosition::UpperLeft)
+            .label_font(("Calibri", 26))
+            .draw()
+            .unwrap();
+    }
+
     pub fn _calculate_box_dimension(&self, attractor_points: Vec<(f64, f64)>) -> f64 {
         let x_min = attractor_points
             .iter()
@@ -678,7 +744,7 @@ impl Runner {
             .fold(f64::NEG_INFINITY, f64::max);
 
         //let scales = vec![15., 45.254834, 64., 90.50966799, 128., 181.01933598];
-        let scales = vec![30., 50., 100., 150., 250., 300.];
+        let scales = vec![50., 100., 150., 250., 300., 350.];
         //let scales = vec![5.];
 
         let mut dimensions = Vec::new();

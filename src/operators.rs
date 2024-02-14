@@ -46,7 +46,8 @@ pub fn one_point_crossover(
     p1: &IteratedFunctionSystem,
     p2: &IteratedFunctionSystem,
 ) -> (IteratedFunctionSystem, IteratedFunctionSystem) {
-    let crossover_point = rand::thread_rng().gen_range(0..p1.functions[0].len());
+    let scale_cross_point = rand::thread_rng().gen_range(0..4);
+    let trans_cross_point = rand::thread_rng().gen_range(4..6);
 
     let mut c1 = IteratedFunctionSystem {
         functions: Vec::new(),
@@ -58,31 +59,58 @@ pub fn one_point_crossover(
         fitness: 0.0,
     };
 
+    let mut fs1_new = [0.0; 6];
+    let mut fs2_new = [0.0; 6];
+
     for (f1, f2) in p1.functions.iter().zip(p2.functions.iter()) {
         if rand::thread_rng().gen::<f64>() < 0.5 {
-            let function1: [f64; 6] = f1[..crossover_point]
+            let scale_1: [f64; 4] = f1[..scale_cross_point]
                 .iter()
                 .copied()
-                .chain(f2[crossover_point..].iter().copied())
+                .chain(f2[scale_cross_point..4].iter().copied())
                 .collect::<Vec<f64>>()
                 .try_into()
                 .unwrap();
-            let function2: [f64; 6] = f1[..crossover_point]
+
+            let trans_1: [f64; 2] = f1[4..trans_cross_point]
                 .iter()
                 .copied()
-                .chain(f2[crossover_point..].iter().copied())
+                .chain(f2[trans_cross_point..].iter().copied())
                 .collect::<Vec<f64>>()
                 .try_into()
                 .unwrap();
-            c1.functions.push(function1);
-            c2.functions.push(function2);
+
+            let scale_2: [f64; 4] = f2[..scale_cross_point]
+                .iter()
+                .copied()
+                .chain(f1[scale_cross_point..4].iter().copied())
+                .collect::<Vec<f64>>()
+                .try_into()
+                .unwrap();
+
+            let trans_2: [f64; 2] = f2[4..trans_cross_point]
+                .iter()
+                .copied()
+                .chain(f1[trans_cross_point..].iter().copied())
+                .collect::<Vec<f64>>()
+                .try_into()
+                .unwrap();
+
+            fs1_new[..4].copy_from_slice(&scale_1);
+            fs1_new[4..].copy_from_slice(&trans_1);
+
+            fs2_new[..4].copy_from_slice(&scale_2);
+            fs2_new[4..].copy_from_slice(&trans_2);
+
+            c1.functions.push(fs1_new);
+            c2.functions.push(fs2_new);
         } else {
             c1.functions.push(*f1);
             c2.functions.push(*f2);
         }
     }
 
-    return (c1, c2);
+    (c1, c2)
 }
 
 pub fn reassortment(
@@ -116,21 +144,22 @@ pub fn reassortment(
         }
     }
 
-    return (c1, c2);
+    (c1, c2)
 }
 
 pub fn random_or_binary_mutation(ifs: &mut IteratedFunctionSystem) {
     let mut rng = thread_rng();
 
-    let mutated_functions: Vec<[f64; 6]> = ifs
+    let _: Vec<[f64; 6]> = ifs
         .functions
-        .iter()
+        .iter_mut()
         .map(|func| {
-            func.iter()
-                .map(|coefficient| {
+            func.iter_mut()
+                .enumerate()
+                .map(|(i, coefficient)| {
                     if rng.gen::<f64>() < PARAMS.mutation_probability {
                         if rng.gen::<f64>() < 0.5 {
-                            mutate_random(*coefficient)
+                            mutate_random(i)
                         } else {
                             mutate_binary(*coefficient)
                         }
@@ -145,12 +174,13 @@ pub fn random_or_binary_mutation(ifs: &mut IteratedFunctionSystem) {
         .collect();
 }
 
-fn mutate_random(coefficient: f64) -> f64 {
+fn mutate_random(i: usize) -> f64 {
     let mut rng = thread_rng();
 
-    let a = PARAMS.min_singel_coefficient;
-    let b = PARAMS.max_singel_coefficient;
-
+    let (a, b) = match i {
+        0..=3 => (-1.0, 1.0),
+        _ => (PARAMS.min_singel_coefficient, PARAMS.max_singel_coefficient),
+    };
     rng.sample(Uniform::new(a, b))
 }
 
@@ -171,8 +201,6 @@ fn mutate_binary(coefficient: f64) -> f64 {
 pub fn gaussian_mutation(ifs: &mut IteratedFunctionSystem) {
     let mut rng = rand::thread_rng();
 
-    let a = PARAMS.min_singel_coefficient;
-    let b = PARAMS.max_singel_coefficient;
     let r = PARAMS.gaussian_mutation_radius;
 
     let mutated_functions: Vec<[f64; 6]> = ifs
@@ -180,8 +208,13 @@ pub fn gaussian_mutation(ifs: &mut IteratedFunctionSystem) {
         .iter()
         .map(|func| {
             func.iter()
-                .map(|coefficient| {
+                .enumerate()
+                .map(|(i, coefficient)| {
                     if rng.gen::<f64>() < PARAMS.mutation_probability {
+                        let (a, b) = match i {
+                            0..=3 => (-1.0, 1.0),
+                            _ => (PARAMS.min_singel_coefficient, PARAMS.max_singel_coefficient),
+                        };
                         rng.sample(Normal::new(*coefficient, r * (b - a)).unwrap())
                             .max(a)
                             .min(b)
